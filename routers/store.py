@@ -2,9 +2,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
 from sqlalchemy.orm import Session
-from database import get_db, Base, engine
+from database import get_db
 from models import StoreItem
 from utils.auth import get_current_user
+from models import StoreItem, Inventory
 import requests
 
 # Initialize router
@@ -18,25 +19,36 @@ class StoreItemResponse(BaseModel):
     price: float
     category: str
     available: bool
-    owned: bool
 
     class Config:
         orm_mode = True
 
+
 class PurchaseRequest(BaseModel):
     item_id: int
 
-# Routes
 
 @router.get("/store", response_model=List[StoreItemResponse])
-def get_store_items(category: str = None, db: Session = Depends(get_db)):
+def get_store_items(
+    category: str = None, 
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user)
+):
     """
-    Retrieve available store items, optionally filtered by category.
+    Retrieve available store items, filtering out those the user already owns.
     """
-    query = db.query(StoreItem).filter(StoreItem.available == True)
+
+    # Get the list of item IDs the user already owns
+    owned_items = db.query(Inventory.item_id).filter(Inventory.user_id == user_id).subquery()
+
+    # Query only items NOT in the user's inventory
+    query = db.query(StoreItem).filter(StoreItem.available == True, StoreItem.id.not_in(owned_items))
+
     if category:
         query = query.filter(StoreItem.category == category)
+
     return query.all()
+
 
 @router.post("/store/purchase")
 def purchase_item(
@@ -47,10 +59,16 @@ def purchase_item(
     """
     Purchase an item from the store for the authenticated user.
     """
-    # Fetch the store item
-    store_item = db.query(StoreItem).filter(StoreItem.id == request.item_id, StoreItem.available == True, StoreItem.owned == False).first()
+
+    # Fetch the store item (ensuring it's available)
+    store_item = db.query(StoreItem).filter(StoreItem.id == request.item_id, StoreItem.available == True).first()
     if not store_item:
         raise HTTPException(status_code=404, detail="Item not found or unavailable")
+
+    # Check if the user already owns the item
+    already_owned = db.query(Inventory).filter(Inventory.user_id == user_id, Inventory.item_id == store_item.id).first()
+    if already_owned:
+        raise HTTPException(status_code=400, detail="You already own this item")
 
     # Deduct points via the points service
     points_service_url = "http://points-service:8002/points/deduct"
@@ -61,23 +79,9 @@ def purchase_item(
     except requests.RequestException as e:
         raise HTTPException(status_code=400, detail="Failed to deduct points") from e
 
-    # Update the store item to mark it as owned
-    store_item.owned = True
+    # Add item to user's inventory (only storing item_id)
+    new_inventory_entry = Inventory(user_id=user_id, item_id=store_item.id)
+    db.add(new_inventory_entry)
     db.commit()
-
-    # Notify the inventory service
-    inventory_service_url = "http://inventory-service:8001/inventory/add"
-    inventory_payload = {
-        "user_id": user_id,
-        "item_id": store_item.id,
-        "name": store_item.name,
-        "description": store_item.description,
-        "category": store_item.category,
-    }
-    try:
-        inventory_response = requests.post(inventory_service_url, json=inventory_payload)
-        inventory_response.raise_for_status()
-    except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail="Failed to add item to inventory") from e
 
     return {"message": "Item purchased successfully", "item_id": store_item.id}

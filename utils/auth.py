@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-auth_service_url = "http://localhost:8001/"
+auth_service_url = os.getenv("AUTH_API_URL")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{auth_service_url}/login")
 
 # Load the internal secret from the environment variables
