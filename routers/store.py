@@ -85,3 +85,29 @@ def purchase_item(
     db.commit()
 
     return {"message": "Item purchased successfully", "item_id": store_item.id}
+
+
+@router.post("/store/add")
+def add_store_item(
+    name: str,
+    description: str,
+    price: float,
+    category: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Adds a new item to the store.
+    """
+    new_item = StoreItem(
+        name=name,
+        description=description,
+        price=price,
+        category=category,
+        available=True
+    )
+
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+
+    return {"message": "Item added successfully", "item_id": new_item.id}
