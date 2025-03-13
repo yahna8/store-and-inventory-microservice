@@ -4,9 +4,21 @@ from models import StoreItem
 db = SessionLocal()
 
 items = [
-    {"name": "Cat", "description": "A study buddy guaranteed to be lazier than you.", "price": 100, "category": "pets"},
-    {"name": "Dog", "description": "Nothing could be more motivating than a puppy waiting for you to finish up your tasks for the day.", "price": 100, "category": "pets"},
-    {"name": "Frog hat", "description": "What if... your cat could be a frog? Or your dog could be a frog? Now we know.", "price": 200, "category": "accessory"}
+    {"name": "Cat",
+        "description": "A study buddy guaranteed to be lazier than you.",
+        "image": "/static/cat.png",
+        "price": 100,
+        "category": "pets"},
+    {"name": "Dog",
+        "description": "Nothing could be more motivating than a puppy waiting for you to finish up your tasks for the day.",
+        "image": "/static/dog.png",
+        "price": 100,
+        "category": "pets"},
+    {"name": "Frog hat",
+        "description": "What if... your cat could be a frog? Or your dog could be a frog? Now you can find out.",
+        "image": "/static/frog-hat.png",
+        "price": 200,
+        "category": "accessory"}
 ]
 
 for item in items:

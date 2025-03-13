@@ -1,6 +1,7 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from routers import store  # Import your tasks router
+from routers import store, inventory  # Import your tasks router
 from database import engine, Base
 import uvicorn
 
@@ -11,6 +12,10 @@ Base.metadata.create_all(bind=engine)
 
 # Include the router
 app.include_router(store.router)
+app.include_router(inventory.router)
+
+# Serve static assets
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
